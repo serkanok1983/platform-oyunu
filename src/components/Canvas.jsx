@@ -3,7 +3,7 @@ import {useEffect, useRef, useState, useMemo} from 'react';
 const Canvas = () => {
     const canvasRef = useRef(null);
 
-    // Karakter ve fizik verileri
+    // Karakter, fizik ve engel verileri
     const [player, setPlayer] = useState({
         x: 50,
         y: 300,
@@ -13,11 +13,17 @@ const Canvas = () => {
         isJumping: false, // Zıplama kontrolü
     });
 
+    const [obstacles, setObstacles] = useState([
+        { x: 400, y: 330, width: 20, height: 20 }, // İlk engel
+    ]);
+
     const platforms = useMemo(() => [
         { x: 0, y: 350, width: 800, height: 20 }, // Zemin
         { x: 200, y: 250, width: 100, height: 20 }, // 1. Platform
         { x: 400, y: 200, width: 150, height: 20 }, // 2. Platform
     ], []);
+
+    const [score, setScore] = useState(0); // Skor
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -39,9 +45,20 @@ const Canvas = () => {
                 ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
             });
 
+            // Engelleri çiz
+            ctx.fillStyle = 'red';
+            obstacles.forEach((obstacle) => {
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            });
+
             // Karakteri çiz
             ctx.fillStyle = 'blue';
             ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            // Skoru yazdır
+            ctx.fillStyle = 'black';
+            ctx.font = '20px Arial';
+            ctx.fillText(`Skor: ${score}`, 10, 30);
         };
 
         const updatePlayer = () => {
@@ -83,6 +100,51 @@ const Canvas = () => {
             });
         };
 
+        const updateObstacles = () => {
+            setObstacles((prev) =>
+                prev.map((obstacle) => ({
+                    ...obstacle,
+                    x: obstacle.x - 5, // Engeller sola doğru hareket eder
+                })).filter((obstacle) => obstacle.x + obstacle.width > 0) // Ekran dışına çıkan engelleri kaldır
+            );
+
+            // Yeni engeller oluştur
+            if (Math.random() < 0.02) {
+                setObstacles((prev) => [
+                    ...prev,
+                    { x: canvas.width, y: 330, width: 20, height: 20 },
+                ]);
+            }
+        };
+
+        const checkCollisions = () => {
+            const isColliding = obstacles.some((obstacle) =>
+                player.x < obstacle.x + obstacle.width &&
+                player.x + player.width > obstacle.x &&
+                player.y < obstacle.y + obstacle.height &&
+                player.y + player.height > obstacle.y
+            );
+
+            if (isColliding) {
+                alert(`Oyun bitti! Skor: ${score}`);
+                setScore(0); // Skoru sıfırla
+                setPlayer({
+                    x: 50,
+                    y: 300,
+                    width: 50,
+                    height: 50,
+                    velocityY: 0,
+                    isJumping: false,
+                });
+                setObstacles([{ x: 400, y: 330, width: 20, height: 20 },
+                ]); // Engelleri sıfırla
+            }
+        };
+
+        const incrementScore = () => {
+            setScore((prev) => prev + 1);
+        };
+
         const handleKeyDown = (event) => {
             const { key } = event;
 
@@ -105,6 +167,9 @@ const Canvas = () => {
 
         const gameLoop = setInterval(() => {
             updatePlayer();
+            updateObstacles();
+            checkCollisions();
+            incrementScore();
             draw();
         }, 16); // Yaklaşık 60 FPS
 
@@ -112,7 +177,7 @@ const Canvas = () => {
             window.removeEventListener('keydown', handleKeyDown);
             clearInterval(gameLoop);
         };
-    }, [player, platforms]);
+    }, [player, obstacles, platforms, score]);
 
     return <canvas ref={canvasRef} width={800} height={600} style={{ border: '1px solid black' }} />;
 
